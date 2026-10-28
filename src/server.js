@@ -34,6 +34,8 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 if (fs.existsSync(path.join(config.clientDist, 'index.html'))) {
   app.use(express.static(config.clientDist, { index: false, maxAge: '1h' }));
   app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(config.clientDist, 'index.html')));
+} else {
+  app.get('/', (req, res) => res.json({ name: 'QR Print Shop API', ok: true, health: '/api/health' }));
 }
 
 // eslint-disable-next-line no-unused-vars
