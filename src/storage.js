@@ -21,6 +21,7 @@ export class LocalStorage {
 
   async save(buffer, ext = '.pdf') {
     const key = `${crypto.randomUUID()}${ext}`;
+    await fsp.mkdir(this.dir, { recursive: true });
     await fsp.writeFile(this.#file(key), buffer);
     return key;
   }
@@ -47,7 +48,10 @@ export class LocalStorage {
   }
 
   async list() {
-    const names = await fsp.readdir(this.dir);
+    const names = await fsp.readdir(this.dir).catch((err) => {
+      if (err.code === 'ENOENT') return [];
+      throw err;
+    });
     const out = [];
     for (const key of names) {
       try {

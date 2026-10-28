@@ -1,6 +1,6 @@
 # QR Print Shop — Backend
 
-Express + SQLite API for a self-service QR printing system. Customers upload PDFs/photos from their phone. A print agent on the shop PC polls this API and prints the jobs.
+Express + SQLite (sql.js — pure WebAssembly, no native build) API for a self-service QR printing system. Customers upload PDFs/photos from their phone. A print agent on the shop PC polls this API and prints the jobs.
 
 ## Run
 ```bash
