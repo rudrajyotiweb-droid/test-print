@@ -46,8 +46,33 @@ export function requireAdmin(req, res, next) {
   const shopId = adminShopId(req);
   const shop = shopId && getShop(shopId);
   if (!shop) return res.status(401).json({ error: 'Not logged in' });
+  if (shop.disabled) return res.status(403).json({ error: 'This shop account is disabled', code: 'SHOP_DISABLED' });
   req.shop = shop;
   next();
+}
+
+export const SUPER_COOKIE = 'qrprint_super';
+
+export function requireSuper(req, res, next) {
+  const token = req.cookies?.[SUPER_COOKIE];
+  try {
+    if (token && jwt.verify(token, config.jwtSecret).role === 'super') return next();
+  } catch {
+    /* invalid or expired */
+  }
+  res.status(401).json({ error: 'Not logged in' });
+}
+
+export function setSuperCookie(res) {
+  const token = jwt.sign({ role: 'super' }, config.jwtSecret, { expiresIn: '7d' });
+  const sameSite = config.cookieSameSite === 'none' ? 'none' : config.cookieSameSite === 'strict' ? 'strict' : 'lax';
+  res.cookie(SUPER_COOKIE, token, {
+    httpOnly: true,
+    sameSite,
+    secure: config.isProd || sameSite === 'none',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/',
+  });
 }
 
 export function setAdminCookie(res, shopId) {

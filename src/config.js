@@ -21,6 +21,7 @@ export const config = {
   publicUrl: trimSlash(process.env.PUBLIC_URL) || 'http://localhost:5173',
   apiUrl: trimSlash(process.env.API_URL),
   jwtSecret: process.env.JWT_SECRET || 'change-me',
+  superadminPassword: process.env.SUPERADMIN_PASSWORD || '',
   isProd: process.env.NODE_ENV === 'production',
   cookieSameSite: (process.env.COOKIE_SAMESITE || 'lax').toLowerCase(),
 

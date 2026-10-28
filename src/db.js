@@ -54,6 +54,17 @@ CREATE INDEX IF NOT EXISTS idx_jobs_queue ON jobs(shop_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_jobs_code  ON jobs(shop_id, code, created_at);
 `);
 
+// Columns added after the first release — add them to existing databases too
+const shopColumns = db.prepare('PRAGMA table_info(shops)').all().map((c) => c.name);
+const addShopColumn = (name, definition) => {
+  if (!shopColumns.includes(name)) db.exec(`ALTER TABLE shops ADD COLUMN ${name} ${definition}`);
+};
+addShopColumn('disabled', 'INTEGER NOT NULL DEFAULT 0');
+addShopColumn('subscription_until', 'TEXT'); // NULL = no expiry
+addShopColumn('activation_code', 'TEXT'); // one-time code the desktop agent exchanges for a token
+addShopColumn('phone', 'TEXT');
+addShopColumn('note', 'TEXT');
+
 export const nowIso = () => new Date().toISOString();
 
 export function startOfTodayIso() {

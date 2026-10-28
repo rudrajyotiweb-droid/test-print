@@ -10,6 +10,7 @@ import { agentRouter } from './routes/agent.js';
 import { publicRouter } from './routes/public.js';
 import { adminRouter } from './routes/admin.js';
 import { paymentsRouter } from './routes/payments.js';
+import { superRouter } from './routes/super.js';
 import { startCron } from './lib/cron.js';
 
 const app = express();
@@ -27,6 +28,7 @@ app.use('/api', agentRouter);
 app.use('/api', publicRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/super', superRouter);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 // In production the built React app is served from the same origin (keeps cookies + SSE simple).

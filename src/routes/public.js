@@ -6,7 +6,7 @@ import { db, nowIso } from '../db.js';
 import { config } from '../config.js';
 import { storage } from '../storage.js';
 import { bus, openSse } from '../lib/events.js';
-import { getShop, publicShop } from '../lib/shops.js';
+import { getShop, publicShop, serviceStatus } from '../lib/shops.js';
 import { getJob, publicJob, emitJob, generateCode, round2 } from '../lib/jobs.js';
 import { isPdf, countPages, parseRange, formatRange } from '../lib/pdf.js';
 
@@ -49,6 +49,9 @@ publicRouter.post('/jobs', jobLimiter, upload.single('file'), async (req, res) =
 
   const shop = getShop(String(s.shopId || req.body.shopId || ''));
   if (!shop) return res.status(404).json({ error: 'Shop not found', code: 'SHOP_NOT_FOUND' });
+  if (!serviceStatus(shop).active) {
+    return res.status(403).json({ error: 'This shop is not accepting print jobs right now', code: 'SHOP_INACTIVE' });
+  }
 
   const buf = req.file?.buffer;
   if (!buf) return res.status(400).json({ error: 'No file uploaded', code: 'NO_FILE' });

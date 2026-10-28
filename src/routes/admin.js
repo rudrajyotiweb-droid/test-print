@@ -5,7 +5,7 @@ import { db, startOfTodayIso } from '../db.js';
 import { config } from '../config.js';
 import { storage } from '../storage.js';
 import { bus, openSse } from '../lib/events.js';
-import { getShop, publicShop, hashToken, newAgentToken, shopUrl } from '../lib/shops.js';
+import { getShop, adminShop, publicShop, hashToken, newAgentToken, issueActivationCode } from '../lib/shops.js';
 import { getJob, adminJob, updateJob } from '../lib/jobs.js';
 import { qrPng, qrPosterPdf } from '../lib/qr.js';
 import { requireAdmin, setAdminCookie, clearAdminCookie } from '../middleware/auth.js';
@@ -20,15 +20,12 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts. Try again later.' },
 });
 
-function adminShop(shop) {
-  return { ...publicShop(shop), shopUrl: shopUrl(shop.id) };
-}
-
 adminRouter.post('/login', loginLimiter, async (req, res) => {
   const { shopId, password } = req.body || {};
   const shop = getShop(String(shopId || '').trim());
   const ok = shop && (await bcrypt.compare(String(password || ''), shop.password_hash));
   if (!ok) return res.status(401).json({ error: 'Wrong shop ID or password', code: 'BAD_LOGIN' });
+  if (shop.disabled) return res.status(403).json({ error: 'This shop account is disabled', code: 'SHOP_DISABLED' });
   setAdminCookie(res, shop.id);
   res.json(adminShop(shop));
 });
@@ -135,6 +132,11 @@ adminRouter.put('/shop', async (req, res) => {
   const shop = getShop(s.id);
   bus.emit(`shop:${shop.id}`, { type: 'shop', shop: adminShop(shop) });
   res.json(adminShop(shop));
+});
+
+// One-time code the shop types into the desktop agent (it is exchanged for a token)
+adminRouter.post('/activation-code', (req, res) => {
+  res.json({ code: issueActivationCode(req.shop.id) });
 });
 
 // Agent tokens are stored hashed, so the only way to "see" one again is to issue a new one.

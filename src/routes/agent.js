@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { db, nowIso } from '../db.js';
 import { config } from '../config.js';
 import { storage } from '../storage.js';
-import { getShop, touchHeartbeat } from '../lib/shops.js';
+import rateLimit from 'express-rate-limit';
+import { getShop, touchHeartbeat, serviceStatus, normalizeCode, newAgentToken, hashToken } from '../lib/shops.js';
 import { getJob, emitJob, updateJob } from '../lib/jobs.js';
 import { hasAgentToken, adminShopId, requireAgentForShopQuery } from '../middleware/auth.js';
 
@@ -29,15 +30,39 @@ const claimNext = db.transaction((shopId) => {
   return res.changes ? getJob(job.id) : null;
 });
 
+const activateLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Try again later.' },
+});
+
+// POST /api/agent/activate { code }  → exchange a one-time activation code for agent credentials
+agentRouter.post('/agent/activate', activateLimiter, (req, res) => {
+  const code = normalizeCode(req.body?.code);
+  const shop = code.length === 8 && db.prepare('SELECT * FROM shops WHERE activation_code = ?').get(code);
+  if (!shop) return res.status(404).json({ error: 'Activation code not found or already used', code: 'BAD_CODE' });
+  if (shop.disabled) return res.status(403).json({ error: 'This shop account is disabled', code: 'SHOP_DISABLED' });
+
+  const token = newAgentToken();
+  db.prepare('UPDATE shops SET agent_token_hash = ?, activation_code = NULL WHERE id = ?').run(hashToken(token), shop.id);
+  touchHeartbeat(shop);
+  res.json({ server_url: baseUrl(req), shop_id: shop.id, shop_name: shop.name, token });
+});
+
 // GET /api/agent/ping?shop=<shopId>  → verify agent credentials without claiming a job
 agentRouter.get('/agent/ping', requireAgentForShopQuery, (req, res) => {
   touchHeartbeat(req.shop);
-  res.json({ ok: true, id: req.shop.id, name: req.shop.name });
+  const service = serviceStatus(req.shop);
+  res.json({ ok: true, id: req.shop.id, name: req.shop.name, active: service.active, reason: service.reason });
 });
 
 // GET /api/jobs/next?shop=<shopId>  → 200 job | 204 nothing to print
 agentRouter.get('/jobs/next', requireAgentForShopQuery, (req, res) => {
   touchHeartbeat(req.shop);
+  // Disabled / expired shops keep their queue but nothing is handed out
+  if (!serviceStatus(req.shop).active) return res.status(204).end();
   const job = claimNext(req.shop.id);
   if (!job) return res.status(204).end();
   emitJob(job);
